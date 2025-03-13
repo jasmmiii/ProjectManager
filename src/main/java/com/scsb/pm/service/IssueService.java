@@ -1,28 +1,23 @@
 package com.scsb.pm.service;
 
 import com.jcraft.jsch.SftpException;
-import com.scsb.pm.dao.IssueRepository;
 import com.scsb.pm.entity.Issue;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
+import com.scsb.pm.entity.Project;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 public interface IssueService {
 
-    List<Issue> getIssuesByAssignee(String assignee);
+//    List<Issue> getIssuesByAssignee(String assignee);
 
-    List<Issue> getAllIssues();
+//    List<Issue> getAllIssues();
 
     Issue findById(Long id);
 
-    Issue createIssue(String title, String description, String due, String assignee, String reporter, MultipartFile attachment) throws IOException, SftpException;
+    Issue createIssue(String title, String description, String due, String assignee, String reporter, MultipartFile attachment, Project project) throws IOException, SftpException;
 
     String getAttachmentName(Long issueId);
 
@@ -32,7 +27,7 @@ public interface IssueService {
 
     Issue updateIssueStatus(Long id, String status);
 
-    Issue editIssue(Long id, Issue updatedIssue, MultipartFile newAttachment, boolean removeAttachment) throws IOException, SftpException;
+    Issue editIssue(Long id, Issue updatedIssue, MultipartFile newAttachment, boolean removeAttachment, Project project) throws IOException, SftpException;
 
     void deleteIssue(Long id);
 

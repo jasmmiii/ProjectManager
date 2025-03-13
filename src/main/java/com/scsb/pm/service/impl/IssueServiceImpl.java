@@ -3,6 +3,7 @@ package com.scsb.pm.service.impl;
 import com.jcraft.jsch.SftpException;
 import com.scsb.pm.dao.IssueRepository;
 import com.scsb.pm.entity.Issue;
+import com.scsb.pm.entity.Project;
 import com.scsb.pm.service.IssueService;
 import com.scsb.pm.service.helper.SftpService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,15 +31,22 @@ public class IssueServiceImpl implements IssueService {
         this.sftpService = sftpService;
     }
 
-    @Override
-    public List<Issue> getIssuesByAssignee(String assignee){
-        return issueRepository.findByAssignee(assignee);
-    }
+//    @Override
+//    public List<Issue> getIssuesByAssignee(String assignee){
+//        return issueRepository.findByAssignee(assignee);
+//    }
 
-    @Override
-    public List<Issue> getAllIssues(){
-        return issueRepository.findAll();
-    }
+//    @Override
+//    public List<Issue> getAllIssues(){
+//        return issueRepository.findAll();
+//    }
+
+//    @Override 測試 沒有用 >用Repository
+//    public List<Issue> getIssuesByProjectId(Long projectId) {
+//        return issueRepository.findByProject_Id(projectId); // ✅ 確保使用 `findByProject_Id`
+//    }
+
+
 
     @Override
     public Issue findById(Long id) {
@@ -47,8 +55,9 @@ public class IssueServiceImpl implements IssueService {
 
 
     @Override
-    public Issue createIssue(String title, String description, String due, String assignee, String reporter, MultipartFile attachment) throws IOException, SftpException {
+    public Issue createIssue(String title, String description, String due, String assignee, String reporter, MultipartFile attachment, Project project) throws IOException, SftpException {
         Issue issue = new Issue();
+        issue.setProject(project);
         issue.setTitle(title);
         issue.setDescription(description);
         issue.setDue(due);
@@ -67,7 +76,7 @@ public class IssueServiceImpl implements IssueService {
                 issue.setAttachmentName(fileName);
                 issue.setLastEditedAt(LocalDateTime.now());
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                throw new RuntimeException(e.getMessage());
             }
         }
         return issueRepository.save(issue);
@@ -132,9 +141,13 @@ public class IssueServiceImpl implements IssueService {
     }
 
     @Override
-    public Issue editIssue(Long id, Issue updatedIssue, MultipartFile newAttachment, boolean removeAttachment) throws IOException, SftpException {
+    public Issue editIssue(Long id, Issue updatedIssue, MultipartFile newAttachment, boolean removeAttachment, Project project) throws IOException, SftpException {
         Issue issue = issueRepository.findById(id).orElseThrow(() -> new RuntimeException("Update Issue failed for ID: " + id));
 
+        // 確保 Issue 屬於該 Project，避免越權操作
+        if (!issue.getProject().getId().equals(project.getId())) {
+            throw new RuntimeException("Issue does not belong to this project");
+        }
         issue.setTitle(updatedIssue.getTitle());
         issue.setDescription(updatedIssue.getDescription());
         issue.setStatus(updatedIssue.getStatus());
@@ -174,6 +187,8 @@ public class IssueServiceImpl implements IssueService {
 
     @Override
     public void deleteIssue(Long id) {
-        issueRepository.deleteById(id);
+        Issue issue = issueRepository.findById(id).orElseThrow(() -> new RuntimeException("Issue not found with id: " + id));
+        issue.setDeleted(true); // 只標記為刪除
+        issueRepository.save(issue);
     }
 }

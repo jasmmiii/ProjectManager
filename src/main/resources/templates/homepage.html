@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns="http://www.w3.org/1999/html">
 <head>
     <meta charset="UTF-8">
     <title>Project Manager</title>
@@ -10,7 +10,7 @@
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 
 <!--    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>-->
-
+    <link rel="stylesheet" href="/css/project.css">
     <style>
         body {
             font-family: 'Georgia', sans-serif;
@@ -84,6 +84,35 @@
         /*    height: 40px; !* 統一高度 *!*/
         /*    padding: 8px 16px; !* 統一內邊距 *!*/
         /*}*/
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+        }
 
     </style>
 </head>
@@ -107,44 +136,115 @@
     <a href="/logout" class="btn btn-danger" onclick="setupSidebarToggle()" >Log Out</a>
 </div>
 
+<div class="container">
+    <h2>Projects</h2>
+    <div class="actions">
+        <input type="text" class="search-bar" id="filter-name" placeholder="搜尋專案名稱">
+        <select class="filter-select" id="filter-status">
+            <option value="">篩選狀態</option>
+            <option value="To-Do">To-Do</option>
+            <option value="Process">Process</option>
+            <option value="Done">Done</option>
+            <option value="Archived">Archived</option>
+        </select>
+        <select class="filter-select" id="filter-created-by">
+            <option value="">搜尋建立者</option>
+        </select>
+        <button id="search-btn">搜尋</button>
+        <button id="create-project-btn">Create Project</button>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>名稱</th>
+            <th>狀態</th>
+            <th>建立者</th>
+            <th>建立日期</th>
+        </tr>
+        </thead>
+        <tbody id="project-list">
+        <!-- Projects will be dynamically loaded here -->
+        </tbody>
+    </table>
+</div>
+
+
+<!-- 創建新專案 Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1" aria-labelledby="createProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createProjectModalLabel">Create Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="project-name" class="form-label text-start w-100">Name</label>
+                    <input type="text" id="project-name" class="form-control" placeholder="Enter project name">
+                </div>
+                <div class="mb-3">
+                    <label for="project-status" class="form-label text-start w-100">Status</label>
+                    <select id="project-status" class="form-select">
+                        <option value="To-Do">ToDo</option>
+                        <option value="Process">Process</option>
+                        <option value="Done">Done</option>
+                        <option value="Archived">Archived</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="project-created-by" class="form-label text-start w-100">Created By</label>
+                    <select id="project-created-by" class="form-select">
+                        <option value="">Select Member</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="submit-project-btn" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 
 <!--主頁內容-->
 <div class="content">
 <!--Issue table-->
-    <h2>Issue Tracker</h2>
-    <div class="d-flex justify-content-start align-items-center mb-3">
-        <!--ADD選項-->
-        <div class="dropdown mb-3">
-            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                ADD
-            </button>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                <a class="dropdown-item" href="#" id="createIssueButton">Create Issue</a>
-                <!-- 其他功能選項 -->
-                <a class="dropdown-item">Overdue Issues</a>
-            </div>
-        </div>
+<!--    <h2>Issue Tracker</h2>-->
+<!--    <div class="d-flex justify-content-start align-items-center mb-3">-->
+<!--        &lt;!&ndash;ADD選項&ndash;&gt;-->
+<!--        <div class="dropdown mb-3">-->
+<!--            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">-->
+<!--                ADD-->
+<!--            </button>-->
+<!--            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">-->
+<!--                <a class="dropdown-item" href="#" id="createIssueButton">Create Issue</a>-->
+<!--                &lt;!&ndash; 其他功能選項 &ndash;&gt;-->
+<!--                <a class="dropdown-item">Overdue Issues</a>-->
+<!--            </div>-->
+<!--        </div>-->
 
-        <!-- 切換查看所有Issue 的按鈕 -->
-        <button class="btn btn-secondary ml-3" id="toggleViewButton">View All Issues</button>
-    </div>
+<!--        &lt;!&ndash; 切換查看所有Issue 的按鈕 &ndash;&gt;-->
+<!--        <button class="btn btn-secondary ml-3" id="toggleViewButton">View All Issues</button>-->
+<!--    </div>-->
 
-    <table class="table table-striped" id="newIssueTable">
-        <thead>
-        <tr>
-            <th>Title</th>
-            <th>Description</th>
-            <th>Status</th>
-            <th>Due</th>
-            <th>Assignee</th>
-            <th>Reporter</th>
-            <th>Edit</th>
-            <th>Delete</th>
-        </tr>
-        </thead>
-        <tbody id="issueTableBody">
-        </tbody>
-    </table>
+<!--    <table class="table table-striped" id="newIssueTable">-->
+<!--        <thead>-->
+<!--        <tr>-->
+<!--            <th>Title</th>-->
+<!--            <th>Description</th>-->
+<!--            <th>Status</th>-->
+<!--            <th>Due</th>-->
+<!--            <th>Assignee</th>-->
+<!--            <th>Reporter</th>-->
+<!--            <th>Edit</th>-->
+<!--            <th>Delete</th>-->
+<!--        </tr>-->
+<!--        </thead>-->
+<!--        <tbody id="issueTableBody">-->
+<!--        </tbody>-->
+<!--    </table>-->
 
 
 <!-- Edit Issue Modal 互動視窗 -->
@@ -200,46 +300,68 @@
 </div>
 
 <!-- Create Issue Modal -->
-<div id="createIssueModal" class="modal fade" tabindex="-1" aria-labelledby="createIssueModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createIssueModalLabel">Create Issue</h5>
-                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+<!--<div id="createIssueModal" class="modal fade" tabindex="-1" aria-labelledby="createIssueModalLabel" aria-hidden="true">-->
+<!--    <div class="modal-dialog">-->
+<!--        <div class="modal-content">-->
+<!--            <div class="modal-header">-->
+<!--                <h5 class="modal-title" id="createIssueModalLabel">Create Issue</h5>-->
+<!--                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">-->
+<!--&lt;!&ndash;                    <span aria-hidden="true">&times;</span>&ndash;&gt;-->
+<!--                </button>-->
+<!--            </div>-->
+<!--            <div class="modal-body">-->
+<!--                <form id="createIssueForm" method="post" enctype="multipart/form-data">-->
+<!--                    <div class="mb-3">-->
+<!--                        <label for="createTitle" class="form-label">Title</label>-->
+<!--                        <input type="text" class="form-control" id="createTitle" name="title" required>-->
+<!--                    </div>-->
+<!--                    <div class="mb-3">-->
+<!--                        <label for="createDescription" class="form-label">Description</label>-->
+<!--                        <textarea class="form-control" id="createDescription" name="description"></textarea>-->
+<!--                    </div>-->
+<!--                    <div class="mb-3">-->
+<!--                        <label for="createDue" class="form-label">Due Date</label>-->
+<!--                        <input type="date" class="form-control" id="createDue" name="due" required>-->
+<!--                    </div>-->
+<!--                    <div class="mb-3">-->
+<!--                        <label for="createAssignee" class="form-label">Assignee</label>-->
+<!--                        <input type="text" class="form-control" id="createAssignee" name="assignee" required>-->
+<!--                    </div>-->
+<!--                    <div class="mb-3">-->
+<!--                        <label for="createAttachment" class="form-label">Attachment</label>-->
+<!--                        <input type="file" class="form-control" id="createAttachment" name="attachment" accept=".pdf,.jpg,.jpeg,.txt">-->
+<!--                        <div class="progress mt-2" style="display: none;" id="uploadProgress">-->
+<!--                            <div class="progress-bar" role="progressbar" style="width: 0; color: #4d82bc;" id="progressBar"></div>-->
+<!--                        </div>-->
+<!--                    </div>-->
+<!--                    <button type="submit" class="btn btn-primary">Create</button>-->
+<!--                </form>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--</div>-->
+
+<!-- 評論視窗 -->
+<!--<div class="modal" id="issueCommentsModal" tabindex="-1" role="dialog">-->
+<!--    <div class="modal-dialog" role="document">-->
+<!--        <div class="modal-content">-->
+<!--            <div class="modal-header">-->
+<!--                <h5 class="modal-title" id="issueCommentsModalLabel">Issue comments</h5>-->
+<!--                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">-->
 <!--                    <span aria-hidden="true">&times;</span>-->
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="createIssueForm" method="post" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="createTitle" class="form-label">Title</label>
-                        <input type="text" class="form-control" id="createTitle" name="title" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="createDescription" class="form-label">Description</label>
-                        <textarea class="form-control" id="createDescription" name="description"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="createDue" class="form-label">Due Date</label>
-                        <input type="date" class="form-control" id="createDue" name="due" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="createAssignee" class="form-label">Assignee</label>
-                        <input type="text" class="form-control" id="createAssignee" name="assignee" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="createAttachment" class="form-label">Attachment</label>
-                        <input type="file" class="form-control" id="createAttachment" name="attachment" accept=".pdf,.jpg,.jpeg,.txt">
-                        <div class="progress mt-2" style="display: none;" id="uploadProgress">
-                            <div class="progress-bar" role="progressbar" style="width: 0; color: #4d82bc;" id="progressBar"></div>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Create</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+<!--                </button>-->
+<!--            </div>-->
+<!--            <div class="modal-body">-->
+<!--                <p id="issueDescription"></p>-->
+<!--                <div id="commentList"></div>-->
+<!--                <form id="addCommentForm">-->
+<!--                    <textarea name="comment" placeholder="Add your comment here..." required></textarea>-->
+<!--                    <button type="submit" class="btn btn-primary">Submit</button>-->
+<!--                </form>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--</div>-->
 
 <div id="successAlert" class="alert alert-success alert-dismissible fade show text-center mx-auto" style="max-width:220px;" role="alert">
     <strong>Login Successful!</strong>
@@ -247,7 +369,6 @@
 
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" rel="stylesheet"></script>
 <script src="/homepage.js"></script>
-
 
 
 </body>

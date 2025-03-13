@@ -35,13 +35,16 @@ public class SftpService {
             channelSftp.cd(remoteDirectory);
             channelSftp.put(fileStream, fileName); // 上傳
         } catch (Exception e) {
-            throw new RuntimeException("Error during SFTP upload file", e);
+            throw new RuntimeException(e.getMessage());
         } finally {
             channelSftp.disconnect();
             session.disconnect();
         }
         return "File uploaded successfully to " + remoteDirectory + "/" + fileName;
     }
+
+
+
 
     /** 下載檔案 （檔案傳到遠端再測試）
     public byte[] downloadFile(String remoteFilePath) throws Exception {
@@ -67,7 +70,7 @@ public class SftpService {
             byte[] fileData = inputStream.readAllBytes();
             return fileData;
 
-        } catch (Exception e){
+        } catch (Exception e){ // 不要用system.
             System.err.println("Error during SFTP file download: " + remoteFilePath);
             throw new RuntimeException("Error during SFTP download file", e);
         } finally {

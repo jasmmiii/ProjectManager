@@ -1,31 +1,33 @@
 package com.scsb.pm.controller;
 
-import com.jcraft.jsch.SftpException;
+import com.scsb.pm.dao.CommentRepository;
 import com.scsb.pm.dao.IssueRepository;
+import com.scsb.pm.dao.LoginRepository;
+import com.scsb.pm.dao.ProjectRepository;
+import com.scsb.pm.entity.Comment;
 import com.scsb.pm.entity.Issue;
+import com.scsb.pm.entity.Member;
+import com.scsb.pm.entity.Project;
+//import com.scsb.pm.service.CommentService;
 import com.scsb.pm.service.IssueService;
 import com.scsb.pm.service.LoginService;
-import com.scsb.pm.service.helper.SftpService;
+import com.scsb.pm.service.ProjectService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 @Controller
@@ -36,11 +38,17 @@ public class PMController {
 
     @Autowired
     private IssueService issueService;
-
-    private final SftpService sftpService = new SftpService();
     @Autowired
     private IssueRepository issueRepository;
 
+    @Autowired
+    private CommentRepository commentRepository;
+    @Autowired
+    private ProjectService projectService;
+    @Autowired
+    private ProjectRepository projectRepository;
+    @Autowired
+    private LoginRepository loginRepository;
 
     /** Show login page */
     @GetMapping("/")
@@ -101,32 +109,135 @@ public class PMController {
     public String logout(){ return "login"; }
 
 
-    /** Get issues for THE USER */
-    @GetMapping("/api/issues")
-    @ResponseBody
-    public List<Issue> getMyIssues(HttpSession session){
-        String username = (String) session.getAttribute("username");
-        return issueService.getIssuesByAssignee(username);
+
+
+    /** 進入 Project 列表 */
+    @GetMapping("/projects")
+    public String showProjects() {
+        return "homepage";
     }
 
-    /** Get All issues */
-    @GetMapping("/api/issues/all")
+    /** Get All Projects with filter */
+    @GetMapping("/api/projects")
     @ResponseBody
-    public List<Issue> getAllIssues(){
-        return issueService.getAllIssues();
+    public List<Project> getProjects(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String createdBy){
+
+        if (createdBy != null) {
+            createdBy = createdBy.trim(); // 確保去除空格
+        }
+
+        List<Project> projects = projectRepository.searchProjects(name, status, createdBy);
+        return projects;
     }
+
+    /** Create Project */
+    @PostMapping("/api/projects")
+    @ResponseBody
+    public ResponseEntity<Project> createProject(@RequestBody Project project){
+        try {
+            Project createdProject = projectService.createProject(project);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdProject);
+        } catch(Exception e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+    // 取得 pm_db 的所有 username (用於前端下拉選單)
+    @GetMapping("/api/projects/members")
+    @ResponseBody
+    public List<Member> getAllMembers() {
+        List<Member> members = loginRepository.findAll();
+        return members;
+    }
+
+    /** 更新 Project Status */
+    @PutMapping("/api/projects/{id}/status")
+    @ResponseBody
+    public ResponseEntity<String> updateProjectStatus(@PathVariable Long id, @RequestBody Map<String, String> request){
+        String newStatus = request.get("status");
+
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project Not Found"));
+
+        project.setStatus(newStatus);
+        projectRepository.save(project);
+
+        return ResponseEntity.ok("Project status updated successfully!");
+    }
+
+
+    /** 進入指定 Project 的 Issues 頁面 */
+    @GetMapping("/projects/{id}/issues")
+    public String showIssues(@PathVariable Long id, Model model) {
+        model.addAttribute("projectId", id); // 傳 projectId 給前端
+        return "issue";
+    }
+
+    /** 取得指定 project 的所有 Issues */
+    @GetMapping("/api/projects/{id}/issues")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getProjectIssues(@PathVariable Long id) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+        List<Issue> issues = issueRepository.findByProjectAndDeletedFalse(project);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("projectName", project.getName());
+        response.put("projectStatus", project.getStatus());
+        response.put("projectCreatedBy", project.getCreatedBy());
+        response.put("projectCreatedDate", project.getCreatedDate());
+        response.put("projectDescription", project.getDescription());
+        response.put("issues", issues);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /** 進入Project的Issues頁面 更新Project */
+    @PutMapping("/api/projects/{id}")
+    @ResponseBody
+    public ResponseEntity<Project> updateProject(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request){
+
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+        // 更新狀態
+        if (request.containsKey("status")) {
+            project.setStatus(request.get("status"));
+        }
+        // 更新 description
+        if (request.containsKey("description")) {
+            project.setDescription(request.get("description"));
+        }
+
+        projectRepository.save(project);
+        return ResponseEntity.ok(project);
+    }
+
+
+//    /** 原 Get issues for THE USER */
+//    @GetMapping("/api/issues")
+//    @ResponseBody
+//    public List<Issue> getMyIssues(HttpSession session){
+//        String username = (String) session.getAttribute("username");
+//        return issueService.getIssuesByAssignee(username);
+//    }
+//    /** 原 Get All issues */
+//    @GetMapping("/api/issues/all")
+//    @ResponseBody
+//    public List<Issue> getAllIssues(){
+//        return issueService.getAllIssues();
+//    }
 
     /** Create new issue */
-    @PostMapping("/api/issues")
+    @PostMapping("/api/projects/{id}/issues")
     @ResponseBody
-//    public Issue createIssue(@RequestBody Issue issue){
-//        return issueService.createIssue(issue);
-//    }
-//    public ResponseEntity<Issue> createIssue(@RequestBody Issue issue) {
-//        Issue createdIssue = issueService.createIssue(issue);
-//        return ResponseEntity.ok(createdIssue);
-//    }
     public ResponseEntity<Issue> createIssue(
+            @PathVariable("id") Long projectId,
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("due") String due,
@@ -135,14 +246,17 @@ public class PMController {
             @RequestParam(value = "attachment", required = false) MultipartFile attachment) {
 
         try {
-            Issue createdIssue = issueService.createIssue(title, description, due, assignee, reporter, attachment);
+            Project project = projectRepository.findById(projectId) // 從資料庫取得 Project
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+            Issue createdIssue = issueService.createIssue(title, description, due, assignee, reporter, attachment, project);
             return ResponseEntity.ok(createdIssue);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    /** Get attachment */
+//    /** Get attachment */
 //    @GetMapping("/api/issues/{id}/attachment")
 //    public ResponseEntity<byte[]> getAttachment(@PathVariable Long id) {
 //        return issueService.getAttachmentResponse(id);
@@ -171,13 +285,13 @@ public class PMController {
     }*/
 
 
-//test
-
-
     /** Update issue status */
-    @PutMapping("/api/issues/{id}/status")
+    @PutMapping("/api/projects/{projectId}/issues/{id}/status")
     @ResponseBody
-    public Issue updateIssueStatus(@PathVariable Long id, @RequestBody Map<String, String> request){
+    public Issue updateIssueStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request){
+
         String status = request.get("status");
         return issueService.updateIssueStatus(id, status);
     }
@@ -185,22 +299,20 @@ public class PMController {
     /**
      * Edit issue
      * */
-//    @GetMapping("/api/issues/{id}")
-//    public ResponseEntity<Issue> getIssue(@PathVariable Long id) {
-//        Issue issue = issueRepository.findById(id)
-//                .orElseThrow(() -> new RuntimeException("Issue not found"));
-//        return ResponseEntity.ok(issue);
-//    }
-    @PutMapping("/api/issues/{id}")
+    @PutMapping("/api/projects/{projectId}/issues/{id}")
     @ResponseBody
     public ResponseEntity<Issue> editIssue(
             @PathVariable Long id,
+            @PathVariable("projectId") Long projectId,
             @RequestPart("issue") Issue updatedIssue,
             @RequestPart(value = "attachment", required = false) MultipartFile newAttachment,
             @RequestParam(value = "removeAttachment", defaultValue = "false") boolean removeAttachment
     ){
         try {
-            Issue updated = issueService.editIssue(id, updatedIssue, newAttachment, removeAttachment);
+            Project project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+            Issue updated = issueService.editIssue(id, updatedIssue, newAttachment, removeAttachment, project);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
             e.printStackTrace();
@@ -210,30 +322,90 @@ public class PMController {
 
 
     /** Delete issue */
-    @DeleteMapping("/api/issues/{id}")
+    @DeleteMapping("/api/projects/{projectId}/issues/{id}")
     @ResponseBody
     public void deleteIssue(@PathVariable Long id){
         issueService.deleteIssue(id);
     }
 
 
-//    /** 新增Comment */
-//    @PostMapping("/api/issues/{id}/comments")
-//    @ResponseBody
-//    public ResponseEntity<Comment> addComment(
-//            @PathVariable Long id,
-//            @RequestBody Map<String, String> payload){
-//        String content = payload.get("content");
-//        String createdBy = "currentUsername";
-//        Comment comment = issueService.addComment(id, content, createdBy);
-//        return ResponseEntity.ok(comment);
-//    }
-//
-//    // 獲取指定 Issue 的所有評論
-//    @GetMapping("/api/issues/{id}/comments")
-//    public ResponseEntity<List<Comment>> getCommentsByIssueId(@PathVariable Long id) {
-//        List<Comment> comments = issueService.getCommentsByIssueId(id);
-//        return ResponseEntity.ok(comments);
-//    }
+    /** 進入指定 Issue 的 Detail-Comment 頁面*/
+    @GetMapping("/projects/{projectId}/issues/{issueId}")
+    public String showIssueDetail(
+            @PathVariable Long projectId,
+            @PathVariable Long issueId,
+            HttpSession session,
+            Model model) {
+
+        String username = (String) session.getAttribute("username");
+        String role = (String) session.getAttribute("role");
+
+        model.addAttribute("username", username);
+        model.addAttribute("role", role);
+
+        model.addAttribute("projectId", projectId);
+        model.addAttribute("issueId", issueId);
+        return "comment"; // ✅ 回傳 comment.html
+    }
+
+    /** 取得指定Issue的詳細資料、留言 */
+    @GetMapping("/api/projects/{projectId}/issues/{issueId}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getIssueDetails(
+            @PathVariable Long projectId,
+            @PathVariable Long issueId){
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("projectName", project.getName());
+        response.put("id", issue.getId());
+        response.put("title", issue.getTitle());
+        response.put("description", issue.getDescription());
+        response.put("status", issue.getStatus());
+        response.put("due", issue.getDue());
+        response.put("reporter", issue.getReporter());
+        response.put("assignee", issue.getAssignee());
+
+        // 加入留言
+        List<Map<String, Object>> comments = issue.getComments().stream().map(comment -> {
+            Map<String, Object> commentMap = new HashMap<>();
+            commentMap.put("author", comment.getAuthor());
+            commentMap.put("content", comment.getContent());
+            commentMap.put("timestamp", comment.getTimestamp());
+            return commentMap;
+        }).collect(Collectors.toList());
+
+        response.put("comments", comments);
+        return ResponseEntity.ok(response);
+    }
+
+    /** 新增留言 */
+    @PostMapping("/api/projects/{projectId}/issues/{issueId}/comments")
+    public ResponseEntity<Comment> addComment(
+            @PathVariable Long projectId,
+            @PathVariable Long issueId,
+            @RequestBody Comment comment) {
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        comment.setIssue(issue);
+        comment.setTimestamp(LocalDateTime.now());
+        Comment savedComment = commentRepository.save(comment);
+
+        return ResponseEntity.ok(savedComment);
+    }
+
+
+
+
 }
 
